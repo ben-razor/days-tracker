@@ -1,0 +1,335 @@
+import React, { useState } from 'react';
+
+export default function CountryDaysTracker() {
+  const [trips, setTrips] = useState([]);
+  const [newTrip, setNewTrip] = useState({ start: '', end: '' });
+  const [customRange, setCustomRange] = useState({ start: '', end: '' });
+  const [customDays, setCustomDays] = useState(null);
+  const [rollingDate, setRollingDate] = useState('');
+  const [rollingDays, setRollingDays] = useState(null);
+
+  const addTrip = () => {
+    if (newTrip.start && newTrip.end) {
+      const start = new Date(newTrip.start);
+      const end = new Date(newTrip.end);
+      if (start <= end) {
+        setTrips([...trips, { start: newTrip.start, end: newTrip.end }]);
+        setNewTrip({ start: '', end: '' });
+      }
+    }
+  };
+
+  const removeTrip = (index) => {
+    setTrips(trips.filter((_, i) => i !== index));
+  };
+
+  const dateToString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const isDateInTrips = (date) => {
+    const dateStr = dateToString(date);
+    return trips.some(trip => {
+      return dateStr >= trip.start && dateStr <= trip.end;
+    });
+  };
+
+  const getTotalDays = () => {
+    const allDates = new Set();
+    trips.forEach(trip => {
+      const start = new Date(trip.start + 'T00:00:00');
+      const end = new Date(trip.end + 'T00:00:00');
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        allDates.add(dateToString(d));
+      }
+    });
+    return allDates.size;
+  };
+
+  const calculateCustomRange = () => {
+    if (customRange.start && customRange.end) {
+      const start = new Date(customRange.start + 'T00:00:00');
+      const end = new Date(customRange.end + 'T00:00:00');
+      if (start <= end) {
+        let count = 0;
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          if (isDateInTrips(d)) {
+            count++;
+          }
+        }
+        setCustomDays(count);
+      }
+    }
+  };
+
+  const calculateRolling180 = () => {
+    if (rollingDate) {
+      const endDate = new Date(rollingDate + 'T00:00:00');
+      const startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - 179);
+      
+      let count = 0;
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        if (isDateInTrips(d)) {
+          count++;
+        }
+      }
+      setRollingDays(count);
+    }
+  };
+
+  const getMonthsToDisplay = () => {
+    if (trips.length === 0) return [];
+    
+    const allDates = trips.flatMap(trip => [
+      new Date(trip.start + 'T00:00:00'), 
+      new Date(trip.end + 'T00:00:00')
+    ]);
+    const minDate = new Date(Math.min(...allDates));
+    const maxDate = new Date(Math.max(...allDates));
+    
+    const months = [];
+    const current = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    const end = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+    
+    while (current <= end) {
+      months.push(new Date(current));
+      current.setMonth(current.getMonth() + 1);
+    }
+    
+    return months;
+  };
+
+  const getDaysInMonth = (year, month) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (year, month) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const getMonthDays = (year, month) => {
+    const daysInMonth = getDaysInMonth(year, month);
+    let count = 0;
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      if (isDateInTrips(date)) {
+        count++;
+      }
+    }
+    
+    return count;
+  };
+
+  const renderCalendar = (monthDate) => {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const daysInMonth = getDaysInMonth(year, month);
+    const firstDay = getFirstDayOfMonth(year, month);
+    const monthDays = getMonthDays(year, month);
+    
+    const days = [];
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-8"></div>);
+    }
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const isInTrip = isDateInTrips(date);
+      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+      
+      days.push(
+        <div
+          key={day}
+          className={`h-8 flex items-center justify-center rounded text-sm ${
+            isInTrip 
+              ? 'bg-blue-500 text-white font-semibold' 
+              : isWeekend 
+              ? 'bg-gray-100 text-gray-600'
+              : 'text-gray-700'
+          }`}
+        >
+          {day}
+        </div>
+      );
+    }
+    
+    return (
+      <div className="border rounded-lg p-4 bg-white shadow-sm">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-semibold text-gray-800">
+            {monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h3>
+          <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+            {monthDays} {monthDays === 1 ? 'day' : 'days'}
+          </span>
+        </div>
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="text-xs font-semibold text-gray-600 text-center">
+              {day}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {days}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Country Days Tracker</h1>
+        
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Add Trip</h2>
+          <div className="flex gap-4 items-end flex-wrap">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+              <input
+                type="date"
+                value={newTrip.start}
+                onChange={(e) => setNewTrip({ ...newTrip, start: e.target.value })}
+                className="border rounded px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+              <input
+                type="date"
+                value={newTrip.end}
+                onChange={(e) => setNewTrip({ ...newTrip, end: e.target.value })}
+                className="border rounded px-3 py-2"
+              />
+            </div>
+            <button
+              onClick={addTrip}
+              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
+            >
+              Add Trip
+            </button>
+          </div>
+          
+          {trips.length > 0 && (
+            <div className="mt-4">
+              <h3 className="font-medium text-gray-700 mb-2">Your Trips:</h3>
+              <div className="space-y-2">
+                {trips.map((trip, index) => (
+                  <div key={index} className="flex items-center gap-3 bg-gray-50 p-2 rounded">
+                    <span className="text-sm">
+                      {new Date(trip.start + 'T00:00:00').toLocaleDateString()} - {new Date(trip.end + 'T00:00:00').toLocaleDateString()}
+                    </span>
+                    <button
+                      onClick={() => removeTrip(index)}
+                      className="text-red-600 hover:text-red-800 text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {trips.length > 0 && (
+          <>
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-2">Total Days in Country</h2>
+              <p className="text-4xl font-bold text-blue-600">{getTotalDays()} days</p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4">Days Between Custom Dates</h2>
+              <div className="flex gap-4 items-end flex-wrap">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={customRange.start}
+                    onChange={(e) => setCustomRange({ ...customRange, start: e.target.value })}
+                    className="border rounded px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={customRange.end}
+                    onChange={(e) => setCustomRange({ ...customRange, end: e.target.value })}
+                    className="border rounded px-3 py-2"
+                  />
+                </div>
+                <button
+                  onClick={calculateCustomRange}
+                  className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition"
+                >
+                  Calculate
+                </button>
+              </div>
+              {customDays !== null && (
+                <p className="mt-4 text-2xl font-semibold text-green-600">
+                  {customDays} {customDays === 1 ? 'day' : 'days'} in country during this period
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <h2 className="text-xl font-semibold mb-4">Rolling 180-Day Window</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Enter a date to see how many days you were in the country during the 180 days before (and including) that date.
+              </p>
+              <div className="flex gap-4 items-end flex-wrap">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={rollingDate}
+                    onChange={(e) => setRollingDate(e.target.value)}
+                    className="border rounded px-3 py-2"
+                  />
+                </div>
+                <button
+                  onClick={calculateRolling180}
+                  className="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700 transition"
+                >
+                  Calculate
+                </button>
+              </div>
+              {rollingDays !== null && rollingDate && (
+                <div className="mt-4">
+                  <p className="text-2xl font-semibold text-purple-600">
+                    {rollingDays} {rollingDays === 1 ? 'day' : 'days'} in country
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    From {new Date(new Date(rollingDate + 'T00:00:00').getTime() - 179 * 24 * 60 * 60 * 1000).toLocaleDateString()} to {new Date(rollingDate + 'T00:00:00').toLocaleDateString()}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {getMonthsToDisplay().map((month, index) => (
+                <div key={index}>
+                  {renderCalendar(month)}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        
+        {trips.length === 0 && (
+          <div className="text-center text-gray-500 mt-12">
+            <p className="text-lg">Add your first trip to get started!</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
